@@ -251,7 +251,6 @@ int main(void) {
     seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
     while (true)
     {
-        printf("calling\n");
         seL4_ReplyRecv(ep_cap_path.capPtr, tag, &sender_badge);
     }
     
