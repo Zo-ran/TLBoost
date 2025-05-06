@@ -146,15 +146,20 @@ static int unpack_elf_to_paddr(
         void const *seg_src_addr = (void const *)((uintptr_t)elf +
                                                   seg_elf_offset);
 
+        if (seg_vaddr == 0x93000000) {
+            seg_dest_paddr = elf_getProgramHeaderPaddr(elf, i);
+        }
+
         /* Check segment sanity and integer overflows. */
-        if ((seg_vaddr < min_vaddr) ||
+        if (((seg_vaddr < min_vaddr) ||
             (seg_size > image_size) ||
             (seg_src_addr < elf) ||
             ((uintptr_t)seg_src_addr + seg_size < (uintptr_t)elf) ||
             (seg_virt_offset > image_size) ||
             (seg_virt_offset + seg_size > image_size) ||
             (seg_dest_paddr < dest_paddr) ||
-            (seg_dest_paddr + seg_size < dest_paddr)) {
+            (seg_dest_paddr + seg_size < dest_paddr)) 
+            && (seg_vaddr != 0x93000000)) {
             printf("ERROR: segement %d invalid\n", i);
             return -1;
         }

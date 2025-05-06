@@ -229,7 +229,9 @@ int elf_getMemoryBounds(
         } else {
             sect_min = elf_getProgramHeaderVaddr(elfFile, i);
         }
-
+        if (sect_min == 0x93000000)
+            continue;
+        
         sect_max = sect_min + elf_getProgramHeaderMemorySize(elfFile, i);
 
         if (sect_max > mem_max) {

@@ -95,4 +95,5 @@ finish:
 	csrrd 	$t8, LOONGARCH_CSR_TLBRSAVE
     st.d 	$t8, $t0, 11*REGBYTES
 
+	li.d 	$sp, 0x90000000
 	b tlboost

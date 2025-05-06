@@ -25,7 +25,41 @@ extern void my_tlb_refill(void);
     !!!! real mode in this function !!!! 
     **** all non-inline functions forbidden ****
 */
+
+#define UART_PTR (0x1FE001E0)
+#define UART_REG_DAT 0x00
+#define UART_REG_LSR 0x05
+
+#define UART_REG_LSR_TFE BIT(5)
+
+#define UART_PREG(x) ((volatile uint8_t *)((UART_PTR) + (x)))
+
+SECTION(".phy.data") int test_data = 1234;
+// SECTION(".phy.text") void phy_print(void) {
+//     test_data = test_data + 1;
+// }
+
+static inline void p_char(unsigned char c) {
+    while(!(*UART_PREG(UART_REG_LSR) & UART_REG_LSR_TFE));
+    *UART_PREG(UART_REG_DAT) = (c & 0xff);
+}
+
 void tlboost(void) {
+    // KERNEL_ELF_BASE 0xFFFF810000000000
+    // KERNEL_ELF_PADDR_BASE 0x90000000
+
+
+    uint64_t TLBRBADV = csr_readq(LOONGARCH_CSR_TLBRBADV);
+    for (int shift = 60; shift >= 0; shift -= 4) {  
+        uint8_t digit = (TLBRBADV >> shift) & 0xF;   
+        if (digit < 10) {
+            p_char('0' + digit);             
+        } else {
+            p_char('A' + (digit - 10));       
+        }
+    }
+    p_char('\r');p_char('\n');
+
     asm volatile(
         "la.abs 	$t0, tlb_context\n"
         "li.d 	$t1, %[OFFSET]\n"

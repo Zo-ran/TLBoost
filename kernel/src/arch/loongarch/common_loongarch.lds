@@ -20,6 +20,15 @@ ENTRY(_start)
 #include <plat/machine/devices_gen.h>
 
 KERNEL_OFFSET = KERNEL_ELF_BASE - KERNEL_ELF_PADDR_BASE;
+PHY_START = 0x93000000;
+
+SECTIONS 
+{
+    . = PHY_START;
+    .phy : {
+        *(.phy.data);
+    }
+}
 
 SECTIONS
 {

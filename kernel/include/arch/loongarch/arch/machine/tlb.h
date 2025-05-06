@@ -12,6 +12,7 @@ extern void init_tlb(void);
 void local_flush_tlb_all(void);
 void setup_tlb_handler(void);
 void tlboost(void);
+void phy_print(void);
 
 /*
  * TLB Invalidate Flush
