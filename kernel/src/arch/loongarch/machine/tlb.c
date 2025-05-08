@@ -49,16 +49,16 @@ void tlboost(void) {
     // KERNEL_ELF_PADDR_BASE 0x90000000
 
 
-    uint64_t TLBRBADV = csr_readq(LOONGARCH_CSR_TLBRBADV);
-    for (int shift = 60; shift >= 0; shift -= 4) {  
-        uint8_t digit = (TLBRBADV >> shift) & 0xF;   
-        if (digit < 10) {
-            p_char('0' + digit);             
-        } else {
-            p_char('A' + (digit - 10));       
-        }
-    }
-    p_char('\r');p_char('\n');
+    // uint64_t TLBRBADV = csr_readq(LOONGARCH_CSR_TLBRBADV);
+    // for (int shift = 60; shift >= 0; shift -= 4) {  
+    //     uint8_t digit = (TLBRBADV >> shift) & 0xF;   
+    //     if (digit < 10) {
+    //         p_char('0' + digit);             
+    //     } else {
+    //         p_char('A' + (digit - 10));       
+    //     }
+    // }
+    // p_char('\r');p_char('\n');
 
     asm volatile(
         "la.abs 	$t0, tlb_context\n"
