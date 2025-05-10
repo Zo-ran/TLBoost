@@ -9,19 +9,19 @@
  * seL4 tutorial part 4: application to be run in a process
  */
 
- #include <stdio.h>
- #include <assert.h>
- 
- #include <sel4/sel4.h>
- #include <sel4utils/process.h>
- 
- #include <utils/zf_log.h>
- #include <sel4utils/sel4_zf_logif.h>
- 
- /* constants */
- #define MSG_DATA 0x6161 //  arbitrary data to send
+#include <stdio.h>
+#include <assert.h>
 
- static inline uint64_t read_stable_counter(void) {
+#include <sel4/sel4.h>
+#include <sel4utils/process.h>
+
+#include <utils/zf_log.h>
+#include <sel4utils/sel4_zf_logif.h>
+
+/* constants */
+#define MSG_DATA 0x6161 //  arbitrary data to send
+
+static inline uint64_t read_stable_counter(void) {
     uint64_t time;
     register uint64_t tmp __asm__ ("r1");  // 临时保存CounterID（如果需要）
 
@@ -44,10 +44,8 @@ int main(int argc, char **argv) {
     tag = seL4_MessageInfo_new(0, 0, 0, 1);
     seL4_SetMR(0, MSG_DATA);
      
-     
     printf("\n\n\n\n---SYSTEM STANDBY FOR TESTING---\n");
-    n = 1;
-    tag = seL4_CallBoost(ep, tag, 10);
+    n = 10;
     t0 = read_stable_counter();
     
     for (uint64_t i = 0; i < n; i++) {

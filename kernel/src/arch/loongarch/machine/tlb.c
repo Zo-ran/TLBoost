@@ -44,21 +44,54 @@ static inline void p_char(unsigned char c) {
     *UART_PREG(UART_REG_DAT) = (c & 0xff);
 }
 
+static inline void p_hex(uint64_t num) {
+    for (int shift = 60; shift >= 0; shift -= 4) {  
+        uint8_t digit = (num >> shift) & 0xF;   
+        if (digit < 10) {
+            p_char('0' + digit);             
+        } else {
+            p_char('a' + (digit - 10));       
+        }
+    }
+}
+
 void tlboost(void) {
-    // KERNEL_ELF_BASE 0xFFFF810000000000
-    // KERNEL_ELF_PADDR_BASE 0x90000000
+    /* 
+        KERNEL_ELF_BASE 0xFFFF810000000000
+        KERNEL_ELF_PADDR_BASE 0x90000000 
+    */
+    
+    /*
+        TLB info: 8路, 256行(8位), 页大小(PS): 16K(14位)
+        TLBIDX range: 0 ~ 2047(2^11 - 1, 1000 0000 0000 - 1, 最大index为7ff)
+        vaddr(15-22 bit) -> TLBIDX, 页大小14bit, 又因为奇偶双页, 所以从15bit开始的8位作为index
+        e.g.
+            vaddr: 0x120128138 
+            TLBIDX: 0x25
+            0x128 = 0001 0010 1000 0000 0000 0000
+                     --- ---- -
+                  = 0010 0101
+                  = 0x25
+        
+    */
+    
 
+    uint64_t asid = csr_readq(LOONGARCH_CSR_ASID);
+    asid &= 0x3ff;
+    p_hex(asid);
+    p_char(':');p_char(' ');
 
-    // uint64_t TLBRBADV = csr_readq(LOONGARCH_CSR_TLBRBADV);
-    // for (int shift = 60; shift >= 0; shift -= 4) {  
-    //     uint8_t digit = (TLBRBADV >> shift) & 0xF;   
-    //     if (digit < 10) {
-    //         p_char('0' + digit);             
-    //     } else {
-    //         p_char('A' + (digit - 10));       
-    //     }
-    // }
-    // p_char('\r');p_char('\n');
+    uint64_t TLBRBADV = csr_readq(LOONGARCH_CSR_TLBRBADV);
+    p_hex(TLBRBADV);
+    p_char('\r');p_char('\n');
+
+    if (TLBRBADV == 0x120001cc0) {
+        asm volatile("tlbsrch\n");
+        uint64_t TLBIDX = csr_readq(LOONGARCH_CSR_TLBIDX);
+        TLBIDX &= 0xffff;
+        p_hex(TLBIDX);
+        p_char('\r');p_char('\n');
+    }
 
     asm volatile(
         "la.abs 	$t0, tlb_context\n"

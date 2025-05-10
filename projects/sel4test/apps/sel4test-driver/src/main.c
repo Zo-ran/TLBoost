@@ -13,6 +13,7 @@
 
 #include <simple/simple.h>
 #include <simple-default/simple-default.h>
+#include <sel4platsupport/platsupport.h>
 
 #include <vka/object.h>
 
@@ -100,7 +101,8 @@ void init_env() {
     /* create a vka (interface for interacting with the underlying allocator) */
     allocman_make_vka(&vka, allocman);
 
-    
+    platsupport_serial_setup_simple(&vspace, &simple, &vka);
+
     error = sel4utils_bootstrap_vspace_with_bootinfo_leaky(&vspace,
                                                            &data, simple_get_pd(&simple), &vka, info);
     ZF_LOGF_IFERR(error, "Failed to prepare root thread's VSpace for use.\n"
@@ -115,6 +117,13 @@ void init_env() {
     ZF_LOGF_IF(virtual_reservation.res == NULL, "Failed to reserve a chunk of memory.\n");
     bootstrap_configure_virtual_pool(allocman, vaddr,
                                      ALLOCATOR_VIRTUAL_POOL_SIZE, simple_get_pd(&simple));
+
+    /* create an endpoint */
+    vka_object_t ep_object = {0};
+    error = vka_alloc_endpoint(&vka, &ep_object);
+    ZF_LOGF_IFERR(error, "Failed to allocate new endpoint object.\n");
+
+    vka_cspace_make_path(&vka, ep_object.cptr, &ep_cap_path);
 }
 
 void spawn_process() {
@@ -130,17 +139,7 @@ void spawn_process() {
     /* give the new process's thread a name */
     NAME_THREAD(new_process.thread.tcb.cptr, "dynamic-3: process_2");
 
-    /* create an endpoint */
-    vka_object_t ep_object = {0};
-    error = vka_alloc_endpoint(&vka, &ep_object);
-    ZF_LOGF_IFERR(error, "Failed to allocate new endpoint object.\n");
-
-    seL4_CPtr new_ep_cap = 0;
-    
-    vka_cspace_make_path(&vka, ep_object.cptr, &ep_cap_path);
-    
-    new_ep_cap = sel4utils_mint_cap_to_process(&new_process, ep_cap_path,
-                                               seL4_AllRights, EP_BADGE);
+    seL4_CPtr new_ep_cap = sel4utils_mint_cap_to_process(&new_process, ep_cap_path, seL4_AllRights, EP_BADGE);
 
     ZF_LOGF_IF(new_ep_cap == 0, "Failed to mint a badged copy of the IPC endpoint into the new thread's CSpace.\n"
                "\tsel4utils_mint_cap_to_process takes a cspacepath_t: double check what you passed.\n");
@@ -165,17 +164,12 @@ int main(void) {
     init_env();
 
     seL4_Word msg;
-    seL4_IpcRegister(ep_cap_path.capPtr, seL4_MessageInfo_new(0, 0, 0, 0),(seL4_Word)&stk[IPC_STACK_SIZE-1],(seL4_Word)hello);
+    seL4_IpcRegister(ep_cap_path.capPtr, seL4_MessageInfo_new(0, 0, 0, 0),(seL4_Word)&stk[IPC_STACK_SIZE - 1],(seL4_Word)hello);
     msg = seL4_GetMR(2);
     printf("main: got a ipc port %lu\n", msg);
-    
+    printf("eip: %lx\n", (unsigned long)hello);     /* eip: 120001cc0 */
+    printf("esp: %lx\n", &stk[IPC_STACK_SIZE - 1]); /* esp: 12011022c */
     spawn_process();    
 
-    seL4_MessageInfo_t tag = seL4_MessageInfo_new(0, 0, 0, 0);
-    while (true)
-    {
-        // seL4_ReplyRecv(ep_cap_path.capPtr, tag, &sender_badge);
-    }
-
-    return 0;
+    seL4_Recv(ep_cap_path.capPtr, NULL);
 }
