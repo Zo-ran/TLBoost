@@ -68,11 +68,6 @@ seL4_Word sender_badge = 0;
 UNUSED static int stk[IPC_STACK_SIZE];
 
 int hello() {
-    // seL4_Word msg[4];
-    // seL4_GetMSG(msg);
-    printf("Success! Switched to hello func\n");
-    // printf("Hello world!With message: %lx\n",msg[0]);
-    // seL4_SetMR(0, ~msg[0]);
     seL4_ReplyRecv(ep_cap_path.capPtr, seL4_MessageInfo_new(0, 0, 0, 1), &sender_badge);
 }
 
@@ -167,8 +162,6 @@ int main(void) {
     seL4_IpcRegister(ep_cap_path.capPtr, seL4_MessageInfo_new(0, 0, 0, 0),(seL4_Word)&stk[IPC_STACK_SIZE - 1],(seL4_Word)hello);
     msg = seL4_GetMR(2);
     printf("main: got a ipc port %lu\n", msg);
-    printf("eip: %lx\n", (unsigned long)hello);     /* eip: 120001cc0 */
-    printf("esp: %lx\n", &stk[IPC_STACK_SIZE - 1]); /* esp: 12011022c */
     spawn_process();    
 
     seL4_Recv(ep_cap_path.capPtr, NULL);

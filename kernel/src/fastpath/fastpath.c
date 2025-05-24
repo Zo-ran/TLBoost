@@ -6,6 +6,7 @@
 
 #include <config.h>
 #include <fastpath/fastpath.h>
+#include <fastpath/prefetcher.h>
 #ifdef CONFIG_KERNEL_MCS
 #include <object/reply.h>
 #endif
@@ -241,8 +242,6 @@ extern struct ipcServerItem ipcServerList[SERVER_PORT_NUM];
 void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
 {
     seL4_MessageInfo_t info;
-    // cap_t ep_cap;
-    // endpoint_t *ep_ptr;
     word_t length;
     tcb_t *dest;
     word_t badge;
@@ -250,37 +249,9 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
     vspace_root_t *cap_pd;
     pde_t stored_hw_asid;
 
-    // word_t fault_type;
-    // dom_t dom;
-    /* Get message info, length, and fault type. */
-    // info = messageInfoFromWord_raw(msgInfo);
     info.words[0]=msgInfo;
     length = seL4_MessageInfo_get_length(info);
-    // fault_type = seL4_Fault_get_seL4_FaultType(NODE_STATE(ksCurThread)->tcbFault);
-
-    /* Check there's no extra caps, the length is ok and there's no
-     * saved fault. */
-    // if (unlikely(fastpath_mi_check(msgInfo) ||
-    //              fault_type != seL4_Fault_NullFault)) {
-    //     slowpath(SysCall);
-    // }
-
-    /* Lookup the cap */
-    // ep_cap = lookup_fp(TCB_PTR_CTE_PTR(NODE_STATE(ksCurThread), tcbCTable)->cap, cptr);
-
-    /* Check it's an endpoint */
-    // if (unlikely(!cap_capType_equals(ep_cap, cap_endpoint_cap) ||
-    //              !cap_endpoint_cap_get_capCanSend(ep_cap))) {
-    //     slowpath(SysCall);
-    // }
-
-    /* Get the endpoint address */
-    // ep_ptr = EP_PTR(cap_endpoint_cap_get_capEPPtr(ep_cap));
-
-    /* Get the destination thread, which is only going to be valid
-     * if the endpoint is valid. */
-
-    // dest = TCB_PTR(endpoint_ptr_get_epQueue_head(ep_ptr));
+    
     int port;
 #ifdef CONFIG_ARCH_X86_64
     port=NODE_STATE(ksCurThread)->tcbArch.tcbContext.registers[R15];
@@ -304,13 +275,8 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
 
 #ifdef CONFIG_ARCH_LOONGARCH
     port=NODE_STATE(ksCurThread)->tcbArch.tcbContext.registers[a5];
-    // printf("ARM:using ipc port:%d\n",port);
 #endif
     dest=ipcServerList[port].ServerThread;
-    // /* Check that there's a thread waiting to receive */
-    // if (unlikely(endpoint_ptr_get_state(ep_ptr) != EPState_Recv)) {
-    //     slowpath(SysCall);
-    // }
 
     /* ensure we are not single stepping the destination in ia32 */
 #if defined(CONFIG_HARDWARE_DEBUG_API) && defined(CONFIG_ARCH_IA32)
@@ -324,11 +290,6 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
 
     /* Get vspace root. */
     cap_pd = cap_vtable_cap_get_vspace_root_fp(newVTable);
-
-    /* Ensure that the destination has a valid VTable. */
-    // if (unlikely(! isValidVTableRoot_fp(newVTable))) {
-    //     slowpath(SysCall);
-    // }
 
 #ifdef CONFIG_ARCH_AARCH32
     /* Get HW ASID */
@@ -381,29 +342,6 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
     }
 #endif
 
-    /* Ensure the original caller is in the current domain and can be scheduled directly. */
-    // if (unlikely(dest->tcbDomain != ksCurDomain && 0 < maxDom)) {
-    //     slowpath(SysCall);
-    // }
-
-// #ifdef CONFIG_KERNEL_MCS
-//     if (unlikely(dest->tcbSchedContext != NULL)) {
-//         slowpath(SysCall);
-//     }
-
-//     reply_t *reply = thread_state_get_replyObject_np(dest->tcbState);
-//     if (unlikely(reply == NULL)) {
-//         slowpath(SysCall);
-//     }
-// #endif
-
-// #ifdef ENABLE_SMP_SUPPORT
-//     /* Ensure both threads have the same affinity */
-//     if (unlikely(NODE_STATE(ksCurThread)->tcbAffinity != dest->tcbAffinity)) {
-//         slowpath(SysCall);
-//     }
-// #endif /* ENABLE_SMP_SUPPORT */
-
     /*
      * --- POINT OF NO RETURN ---
      *
@@ -414,15 +352,6 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
     ksKernelEntry.is_fastpath = true;
 #endif
 
-    /* Dequeue the destination. */
-    // endpoint_ptr_set_epQueue_head_np(ep_ptr, TCB_REF(dest->tcbEPNext));
-    // if (unlikely(dest->tcbEPNext)) {
-    //     dest->tcbEPNext->tcbEPPrev = NULL;
-    // } else {
-    //     endpoint_ptr_mset_epQueue_tail_state(ep_ptr, 0, EPState_Idle);
-    // }
-
-    // badge = cap_endpoint_cap_get_capEPBadge(ep_cap);
     badge=(seL4_Word)1;    
     /* Unlink dest <-> reply, link src (cur thread) <-> reply */
     thread_state_ptr_set_tsType_np(&NODE_STATE(ksCurThread)->tcbState,
@@ -462,9 +391,6 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
 #endif
 
     fastpath_copy_mrs(length, NODE_STATE(ksCurThread), dest);
-    // printf("Orginal next IP:%lu\n",(unsigned long)NODE_STATE(dest)->tcbArch.tcbContext.registers[NextIP]);
-    // printf("src r10:%lu\t%lx\n",(unsigned long)NODE_STATE(ksCurThread)->tcbArch.tcbContext.registers[R10],(unsigned long)NODE_STATE(ksCurThread)->tcbArch.tcbContext.registers[R10]);
-    // printf("dest r10:%lu\t%lx\n",(unsigned long)NODE_STATE(dest)->tcbArch.tcbContext.registers[R10],(unsigned long)NODE_STATE(dest)->tcbArch.tcbContext.registers[R10]);
 
 #ifdef CONFIG_ARCH_X86_64
     NODE_STATE(dest)->tcbArch.tcbContext.registers[RBX]=(unsigned long)ipcServerList[port].stk;
@@ -492,6 +418,10 @@ void NORETURN fastpath_callBoost(word_t cptr, word_t msgInfo)
     thread_state_ptr_set_tsType_np(&dest->tcbState,
                                    ThreadState_Running);
     switchToThread_fp(dest, cap_pd, stored_hw_asid);
+
+#ifdef CONFIG_ENABLE_PREFETCHER 
+    tlb_prefetch(addrFromPPtr(cap_pd), (vptr_t)ipcServerList[port].func);
+#endif
 
     msgInfo = wordFromMessageInfo(seL4_MessageInfo_set_capsUnwrapped(info, 0));
     fastpath_restore(badge, msgInfo, NODE_STATE(ksCurThread));
